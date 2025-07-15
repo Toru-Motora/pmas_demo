@@ -6,7 +6,6 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack.pm_assistant_form_open_button_block import pm_assistant_form_open_button_block
 from slack.pm_assistant_form_block import pm_assistant_form_block
-from dotenv import load_dotenv
 from logging import Logger
 import requests
 from lib.getsasurl import get_container_sas_url
@@ -14,9 +13,6 @@ from lib.getsasurl import get_container_sas_url
 # ロガーを設定（これにより、Boltの内部ログも表示されやすくなります）
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# .envファイルを読み込む
-load_dotenv()
 
 # Constants should have UPPER_CASE names
 # CACHE_USE_FLAG = "DUMMY"
