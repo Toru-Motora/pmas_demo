@@ -1,0 +1,5 @@
+slack_bolt
+azure-storage-blob
+flake8
+black
+isort
