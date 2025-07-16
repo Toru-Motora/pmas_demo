@@ -1,4 +1,6 @@
 slack_bolt
+slack_sdk
+websocket-client
 azure-storage-blob
 flake8
 black

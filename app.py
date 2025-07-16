@@ -436,4 +436,4 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
 
 
 if __name__ == "__main__":
-    SocketModeHandler(app, app_token).start()
+    SocketModeHandler(app, app_token, trace_enabled=True).start()
