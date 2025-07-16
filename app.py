@@ -460,6 +460,6 @@ if __name__ == "__main__":
         port = int(os.environ.get("PORT", 8000))
         flask_app.run(host="0.0.0.0", port=port)
     else:
-        logger.info("ローカルモードで起動しています")
+        logger.info("ローカルモードで起動しています。")
         # 従来通りSocket Modeのみで実行
         run_socket_mode()
