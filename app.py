@@ -223,7 +223,7 @@ def ex_get_container_sas_url(container_name: str):
     )
 
 # イベントハンドラ
-@app.command("/pmassistant_form")
+@app.command("/pmassistant_form_open")
 def post_pm_assistant_form_open_button_message(ack, say) -> None:
     """
     /pmassistant_form コマンドが実行された場合、フォームを開くボタンを含んだメッセージを送信します。
@@ -239,7 +239,7 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
     )
 
 
-@app.action("pma-form-open-button")
+@app.action("pma-form-open-submit-button")
 def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
     Slackチャンネル上でPMアシスタントAIボタンが押された場合、入力フォームを開きます。

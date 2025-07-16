@@ -17,7 +17,7 @@ def pm_assistant_form_open_button_block():
                     "type": "button",
                     "style": "primary",
                     "text": {"type": "plain_text", "text": "PMアシスタントAI"},
-                    "action_id": "pma-form-open-button",
+                    "action_id": "pma-form-open-submit-button",
                 }
             ],
         },
