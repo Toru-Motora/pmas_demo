@@ -2,6 +2,8 @@ import os
 import logging
 import json
 from sys import addaudithook
+from flask import Flask, jsonify
+from threading import Thread
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack.pm_assistant_form_open_button_block import pm_assistant_form_open_button_block
@@ -34,6 +36,20 @@ if not bot_token:
 if not app_token:
     logger.error("SLACK_APP_TOKEN が設定されていません。")
 
+# Flaskアプリの初期化
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def home():
+    return jsonify({
+        "status": "running",
+        "app": "PMアシスタント",
+        "description": "PMアシスタントアプリが実行中です"
+    })
+
+@flask_app.route("/health")
+def health():
+    return jsonify({"status": "healthy"})
 
 # ボットトークンとソケットモードハンドラーを使ってアプリを初期化します
 app = App(token=bot_token)
@@ -414,26 +430,36 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         #     option=agenda_text
         # )
 
-
-
-        # channelId = "C090N9WCJT1"
-        # #thread_ts = message['ts']
-        # #prompt = message['text'][5:]
-        # #lack_user_id = message['user']
-        #     #say(text="受け付けました", channel=channel, thread_ts=thread_ts)
-        # # access_token, challenge = get_access_token()
-        # access_token = "" #仮★
-        # new_access_token = update_refresh_token(access_token)
-        # #new_access_token = "eyJraWQiOiJvY240c09cLzdvVkxiZWRhclBoWFdjR09LVHZWK3ZQZGVqVzg0MkU1UDl6RT0iLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIwNmM4NGI1MS0yZWQ3LTQ0YWQtYTVlZC0yMDk0MzgzODBlMTAiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLmFwLW5vcnRoZWFzdC0xLmFtYXpvbmF3cy5jb21cL2FwLW5vcnRoZWFzdC0xX3dDWmZ5OXppeCIsImNvZ25pdG86dXNlcm5hbWUiOiIwNmM4NGI1MS0yZWQ3LTQ0YWQtYTVlZC0yMDk0MzgzODBlMTAiLCJvcmlnaW5fanRpIjoiNTgyNzJmYzgtMGU4Ni00MjIwLWE1OTUtOWMyZDc0Y2YzZWYwIiwiYXVkIjoiNWVhNmVhbXVkNzBobGoxMmp1bWJrcGtwamIiLCJldmVudF9pZCI6ImE2Yzg4ZmQ5LTQ1MjUtNDU3Mi1iOGNmLWIxNmMwMWFmZGYyNyIsInRva2VuX3VzZSI6ImlkIiwiYXV0aF90aW1lIjoxNzUwMDY5OTMwLCJleHAiOjE3NTAxNTYzMzAsImlhdCI6MTc1MDA2OTkzMCwianRpIjoiMzMwY2UzYjgtY2I0Zi00OTk1LWI1ZTgtOWUyMzI1NjU3Y2FmIiwiZW1haWwiOiJoaW1la2Ffa2F3YWd1Y2hpK2FrYXNha2FAc2Fpc29uLXRlY2hub2xvZ3kuY29tIn0.tFaXqSEEo3y9fG7Y_P6BJWSAqfLtMTx31T7UrwHF6oIkakwVaM33fhF9Cy4SqxVCJNqzLsyM2Gte6Y1ey_k6yghCLxgaY0VW9R19pZkoUDq1jZWXmrsLcjb69OFe1ntrAj0affVA_TTTtCrzy4JxXpW96_yEpa9GtV3Q5xZ0qZcC935hTps0p8sZLXUTooUb_my3cZuRKk3asYUHCWtTe2ahuYtglunQakT_agjHS_JA7hr4EGAaQ_G_o13cmocOQIpWHvDj4F5g3Ok45OBFiMDJoxXZL45p8GBgmVb0KArrDmleSVUaMEei4uaWSwHzAsNbE65rSGOcju1LUnFBnQ"
-        # res = invoke_hsq_llm_api(new_access_token,channelId)  
-        # #post_user_mail = _replace_mail_domain(post_user_profile["email"])
-        # logger.info("Slackユーザー情報を取得しました。")
-
-
         logger.info("PMアシスタントAI機能が終了しました。")
     except:
         logger.exception("PMアシスタントAI機能実行時に例外が発生しました。")
 
+# Socket Modeハンドラーを実行する関数
+def run_socket_mode():
+    handler = SocketModeHandler(
+        app=app,
+        app_token=app_token,
+        trace_enabled=True,
+        auto_reconnect_enabled=True
+    )
+    handler.start()
 
 if __name__ == "__main__":
-    SocketModeHandler(app, app_token, trace_enabled=True).start()
+    # 環境変数に基づいて実行モードを切り替え
+    # AZURE_WEBAPP_MODE が設定されている場合はハイブリッドモード、それ以外は従来のSocket Modeのみ
+    is_azure_webapp = os.environ.get("AZURE_WEBAPP_MODE", "").lower() == "true"
+    
+    if is_azure_webapp:
+        logger.info("Azure Web App モードで起動しています")
+        # Socket Modeを別スレッドで実行
+        socket_thread = Thread(target=run_socket_mode)
+        socket_thread.daemon = True
+        socket_thread.start()
+        
+        # Flaskサーバーを起動（Azure App Serviceが期待するポート8000で）
+        port = int(os.environ.get("PORT", 8000))
+        flask_app.run(host="0.0.0.0", port=port)
+    else:
+        logger.info("ローカルモードで起動しています")
+        # 従来通りSocket Modeのみで実行
+        run_socket_mode()
