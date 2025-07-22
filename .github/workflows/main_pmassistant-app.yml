@@ -19,37 +19,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- 以下の仮想環境のセットアップと依存関係のインストールステップを削除 ---
-      # - name: Set up Python version
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: '3.12'
-      #     
-      # - name: Create and start virtual environment
-      #   run: |
-      #     python -m venv venv
-      #     source venv/bin/activate
-      #     
-      # - name: Install dependencies
-      #   run: pip install -r requirements.txt
-      # ------------------------------------------------------------------
+      - name: Set up Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
       
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
-      # テストを実行する場合は、ここでも仮想環境のアクティベーションとpip installが必要になりますが、
-      # デプロイパッケージには含めません。
 
       - name: Zip artifact for deployment
-        # このzipコマンドも、vnefv/ を含めないように修正するか、
-        # 後述のwebapps-deployアクションのpackageオプションをうまく活用します。
-        # シンプルに、アプリケーションのコードだけをzipするのが良いでしょう。
-        # 例: zip release.zip ./* -r -x "venv/*" -x ".git/*"
-        run: zip -r release.zip . -x "venv/*" -x ".git/*" -x "__pycache__/*" # venvを除外する
-        
+        run: zip release.zip ./* -r
+
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: release.zip # venvは含めない
+          path: |
+            release.zip
+            !venv/
 
   deploy:
     runs-on: ubuntu-latest
@@ -62,19 +56,13 @@ jobs:
           name: python-app
 
       - name: Unzip artifact for deployment
-        run: unzip -q release.zip # `-q` はquietオプションでログを減らす
+        run: unzip release.zip
 
-      # --- ここが最も重要 ---
+      
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'pmassistant-app'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_B556C9848A0D4FD4A792D9E0D87F2ED2 }}
-          # package: . を追加します。これにより、現在のディレクトリのコンテンツがOryxビルドの入力として使用されます。
-          package: . 
-          # OryxにPythonバージョンを指定します (これにより、自動検出ではなく確実に3.12が使われます)
-          # 注意: これにより、デプロイログに 'Detecting platforms...' 'Version '3.12.11' of platform 'python' is not installed. Generating script to install it...' のようなメッセージが表示されますが、これは正常です。
-          # python-version: '3.12' # このオプションはwebapps-deployアクションでは直接サポートされていない可能性が高いです。Oryxが自動検出するか、App Serviceの構成で設定します。
-                                 # (補足： Oryxは通常、利用可能な最新の3.12を使うはずです)
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_245C43124C5F43EF9F1233A36FBE1F04 }}
