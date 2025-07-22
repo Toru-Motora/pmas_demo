@@ -102,27 +102,6 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                     "text": "チャンネルに参加しているユーザーが表示されています。\n入力内容をご確認頂き、MTG参加者を設定して下さい。",
                 },
             },
-            # 行数を指定する
-            {
-                "block_id": "agenda",
-                "type": "input",
-                "element": {
-                    "type": "plain_text_input",
-                    "multiline": True,
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": "例.\n1. Fit&Gapでの検討事項の共有\n2. ヒアリングシートの確認\n3. デモ環境の説明など",
-                    },
-                },
-                "label": {
-                    "type": "plain_text", 
-                    "text": ":white_check_mark: MTGアウトライン"
-                    },
-                "hint": {
-                    "type": "plain_text",
-                    "text": "MTGアウトライン（当初の計画）を入力してください",
-                },
-            },
             {
                 "block_id": "box_url",
                 "type": "input",
@@ -141,6 +120,26 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                 "hint": {
                     "type": "plain_text",
                     "text": "例: https://sisco001.ent.box.com/file/ファイル名.mp4\n※ローカルパス (C:/Users/...) は使用できません。",
+                },
+            },
+            {
+                "block_id": "agenda",
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "multiline": True,
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "例.\n1. Fit&Gapでの検討事項の共有\n2. ヒアリングシートの確認\n3. デモ環境の説明など",
+                    },
+                },
+                "label": {
+                    "type": "plain_text", 
+                    "text": ":white_check_mark: MTGアウトライン"
+                    },
+                "hint": {
+                    "type": "plain_text",
+                    "text": "MTGアウトライン（当初の計画）を入力してください",
                 },
             },
             # {
