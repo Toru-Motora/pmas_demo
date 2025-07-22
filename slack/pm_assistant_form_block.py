@@ -14,7 +14,7 @@ def number_to_enclosed_numeric(oneBasedNumber: int) -> str:
 # member_detailsは任意
 def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_body: dict):
     """
-    PMアシスタントの入力フォームのブロックを作成します。
+    PMアシスタントの入力フォームのブロックを作成します
     """
 
     return {
