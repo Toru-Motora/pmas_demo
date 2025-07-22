@@ -11,23 +11,6 @@ def number_to_enclosed_numeric(oneBasedNumber: int) -> str:
     return enclosed_numeric_code.to_bytes(4, "big").decode("UTF-8")
 
 
-# _purpose_options = tuple(
-#     map(
-#         lambda v: {
-#             "text": {
-#                 "type": "plain_text",
-#                 "text": number_to_enclosed_numeric(v[0]) + v[1][0],
-#             },
-#             "value": str(v[1][1]),
-#         },
-#         enumerate(
-#             json.loads(getenv("PURPOSE_OPTIONS")).items(),
-#             1,
-#         ),
-#     )
-# )
-
-
 # member_detailsは任意
 def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_body: dict):
     """
