@@ -349,10 +349,13 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
             text="PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
         )
         
+        logger.info(f"メッセージ送信実行、処理開始")
         #2 HSQトークン取得
         access_token, challenge = get_access_token()
         new_access_token = update_refresh_token(access_token)
         print(f"new_access_token: {new_access_token}")
+
+        logger.info(f"HULFT Squareのトークン取得完了")
 
         if DEBUG_MODE:
             # 上のメッセージ送信形式に合わせて日本語で統一
@@ -378,6 +381,8 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
                 )
             )
 
+        logger.info(f"入力情報取得完了")
+
         slack_channel_menbers = [member["display_name"] for member in member_details]
         if DEBUG_MODE:
             client.chat_postMessage(
@@ -399,6 +404,8 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         slack_channel_members_str = ", ".join(slack_channel_menbers)
         print(f"slack_channel_members_str: {slack_channel_members_str}")
 
+        logger.info(f"HULFT Squareのジョブ実行開始")
+
         res = invoke_hsq_translation_api(
             access_token=new_access_token,
             # new_access_token=refresh_token,
@@ -410,7 +417,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
             slack_channel_member=slack_channel_members_str,
             option=agenda_text
         )
-        # print(f"res: {res}")
+        logger.info(f"HULFT Squareのジョブ実行完了")
 
         if DEBUG_MODE:
             client.chat_postMessage(
@@ -429,7 +436,9 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         client.chat_postMessage(
             channel=channel_id_from_metadata,
             text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
-        )        
+        )       
+
+        logger.info(f"炎上リスク分析機能実行完了")
     except:
         logger.exception("炎上リスク分析機能実行時に例外が発生しました。")
 

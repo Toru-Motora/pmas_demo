@@ -16,12 +16,12 @@ PMアシスタントは、会議の録音データを分析し、会議のサマ
 
 以下の環境変数が必要です：
 
-- `SLACK_BOT_TOKEN`: Slackボットトークン
-- `SLACK_APP_TOKEN`: Slackアプリトークン
+- `SLACK_BOT_TOKEN`: Slackボットトークン (xoxb- から始まる)
+- `SLACK_APP_TOKEN`: Slackアプリトークン (xapp- から始まる)
 - `AZURE_STORAGE_ACCOUNT_NAME`: Azure Storageアカウント名
 - `AZURE_STORAGE_ACCOUNT_KEY`: Azure Storageアカウントキー
-- `HSQ_SIGNING_SECRET`: HULFT Square認証用シークレット
-- `HSQ_REFRESH_TOKEN`: HULFT Squareトークン更新用トークン
+- `HSQ_SIGNING_SECRET`: HULFT Square認証用パスワード
+- `AZURE_WEBAPP_MODE`: Azure Web Appモードで実行する場合は "true" に設定
 
 ### Slack権限
 
@@ -85,6 +85,13 @@ PMアシスタントは、会議の録音データを分析し、会議のサマ
    python app.py
    ```
 
+## 実行モード
+
+このアプリケーションは2つの実行モードをサポートしています：
+
+1. **ローカルモード**: デフォルトのモードで、Socket Modeのみで実行されます。
+2. **Azure Web Appモード**: `AZURE_WEBAPP_MODE=true` を設定すると、Socket ModeとFlaskサーバーのハイブリッドモードで実行されます。
+
 ## Azure Blob Storage
 
 このアプリケーションはAzure Blob Storageを使用して、以下の2つのコンテナを利用します：
@@ -98,12 +105,25 @@ SAS (Shared Access Signature) URLを生成して、これらのコンテナへ�
 
 HULFT Squareと連携して以下の処理を行います：
 
-1. 音声ファイルの文字起こし
-2. 会議内容の分析
-3. サマリーと議事録の生成
+1. 認証とトークン取得
+   - `get_access_token()`: ログインAPIを使用してアクセストークンを取得
+   - `update_refresh_token()`: アクセストークンを更新
+
+2. API呼び出し
+   - `invoke_hsq_translation_api()`: 音声ファイル変換APIを呼び出し
 
 ## トラブルシューティング
 
 - **SAS URL認証エラー**: アカウントキーが最新であることを確認し、時刻のずれを考慮して開始時間を現在時刻より5分前に設定
 - **Slack権限エラー**: 必要な権限がすべて付与されていることを確認
-- **HULFT Square認証エラー**: リフレッシュトークンが有効であることを確認
+- **HULFT Square認証エラー**: 
+  - アクセストークンが有効であることを確認
+  - 401 Unauthorized エラーの場合、トークンが無効または期限切れの可能性があります
+  - リクエストパラメータの形式を確認（特に配列を文字列に変換しているか）
+- **データ型エラー**: 
+  - `slack_channel_member`パラメータが文字列形式であることを確認
+  - 配列データを送信する場合は、適切に文字列に変換（例: `", ".join(array)`）
+
+## デバッグモード
+
+`DEBUG_MODE = True` に設定することで、詳細なログ出力と追加のSlackメッセージが表示されます。トラブルシューティング時に有効にしてください。

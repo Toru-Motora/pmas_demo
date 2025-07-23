@@ -64,27 +64,27 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
             #         "text": "炎上リスクがあった場合にアラートを通知します。炎上リスクの早期発見・報告は炎上防止の為に重要な観点です。",
             #     },
             # },
-            {
-                "block_id": "member_name",
-                "type": "input",
-                "element": {
-                    "type": "multi_users_select",
-                    "placeholder": {
-                        "type": "plain_text", 
-                        "text": " "
-                        },
-                    "initial_users": [member["id"] for member in member_details] if member_details and isinstance(member_details[0], dict) and "id" in member_details[0] else member_details,
-                    #"max_selected_items": 10,
-                },
-                "label": {
-                    "type": "plain_text", 
-                    "text": ":white_check_mark: プロジェクトメンバー"
-                },
-                "hint": {
-                    "type": "plain_text",
-                    "text": "チャンネルに参加しているユーザーが表示されています。\n入力内容をご確認頂き、MTG参加者を設定して下さい。",
-                },
-            },
+            # {
+            #     "block_id": "member_name",
+            #     "type": "input",
+            #     "element": {
+            #         "type": "multi_users_select",
+            #         "placeholder": {
+            #             "type": "plain_text", 
+            #             "text": " "
+            #             },
+            #         "initial_users": [member["id"] for member in member_details] if member_details and isinstance(member_details[0], dict) and "id" in member_details[0] else member_details,
+            #         #"max_selected_items": 10,
+            #     },
+            #     "label": {
+            #         "type": "plain_text", 
+            #         "text": ":white_check_mark: プロジェクトメンバー"
+            #     },
+            #     "hint": {
+            #         "type": "plain_text",
+            #         "text": "チャンネルに参加しているユーザーが表示されています。\n入力内容をご確認頂き、MTG参加者を設定して下さい。",
+            #     },
+            # },
             {
                 "block_id": "box_url",
                 "type": "input",
