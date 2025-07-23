@@ -1,6 +1,8 @@
 import os
 import logging
 import json
+import re
+from pickle import TRUE
 from sys import addaudithook
 from flask import Flask, jsonify
 from threading import Thread
@@ -16,27 +18,31 @@ from lib.getsasurl import get_container_sas_url
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants should have UPPER_CASE names
-# CACHE_USE_FLAG = "DUMMY"
-AI_SERVICE = "AOAI"
-AI_MODEL = "gpt-4o"
-AI_TEMPERATURE = 0
-# BOT_TOKEN = "XXXXX"
+# UIを含むログ出力モード
+# DEBUG_MODE = True
+DEBUG_MODE = False
 
 # 環境変数からトークンを読み込む
-# アプリのインストールに成功すると 2 つのトークンが生成される。
-# SLACK_BOT_TOKEN: xoxb- から始まる Bot User OAuth Token
-# SLACK_APP_TOKEN: xapp- から始まる App-Level Token (ソケットモード用 / Basic Information)
+# xoxb- から始まる Bot User OAuth Token
 bot_token = os.environ.get("SLACK_BOT_TOKEN")
+# xapp- から始まる App-Level Token (ソケットモード用 / Basic Information)
 app_token = os.environ.get("SLACK_APP_TOKEN")
 
-# トークンが正しく読み込まれたかを確認するためのログ
-if not bot_token:
-    logger.error("SLACK_BOT_TOKEN が設定されていません。")
-if not app_token:
-    logger.error("SLACK_APP_TOKEN が設定されていません。")
+if DEBUG_MODE:
+    # Slack認証用トークン設定確認
+    if not bot_token:
+        logger.error("SLACK_BOT_TOKEN が設定されていません。")
+    if not app_token:
+        logger.error("SLACK_APP_TOKEN が設定されていません。")
 
-# Flaskアプリの初期化
+
+# 共通定数
+HSQ_SIGN_USER = "toru_motora+llm@saison-technology.com"
+HSQ_SIGN_PASSWORD = os.environ.get("HSQ_SIGNING_SECRET")
+HSQ_API_URL = "https://app.square.hulft.com/v1/users/login"
+
+
+# Flaskアプリの初期化（ローカル実行用）
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
@@ -51,97 +57,61 @@ def home():
 def health():
     return jsonify({"status": "healthy"})
 
-# ボットトークンとソケットモードハンドラーを使ってアプリを初期化します
+# Slackボットトークンとソケットモードハンドラーを使ってアプリを初期化
 app = App(token=bot_token)
-
 
 def get_access_token():
     """
-    login API.を使ってHULFT Square認証情報からアクセストークンを取得
+    login APIを使ってHULFT Square認証情報からアクセストークンを取得する
     """
-    url = 'https://app.square.hulft.com/v1/users/login'
+    url = HSQ_API_URL
     body = {
-        # "email": "himeka_kawaguchi+pma@saison-technology.com",
-        "email": "toru_motora@saison-technology.com",
-        "password": os.environ.get("HSQ_SIGNING_SECRET")
+        "email": HSQ_SIGN_USER,
+        "password": HSQ_SIGN_PASSWORD
     }
     headers = {
         'Content-Type': 'application/json'
     }
     try:
-        response = requests.post(url, json=body, headers=headers, verify=False)
+        logger.info("HULFT Square認証APIにリクエストを送信します: %s", url)
+        response = requests.post(url, json=body, headers=headers, verify=False, timeout=30)
+        logger.info("HULFT Square認証APIのレスポンスステータス: %s", response.status_code)
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"access_token_data: {data}")
+        logger.info("アクセストークン取得に成功しました")
+        # 必要なキーが存在するかチェック
+        if 'accessToken' not in data or 'challenge' not in data:
+            logger.error("レスポンスにaccessTokenまたはchallengeが含まれていません: %s", data)
+            raise ValueError("accessTokenまたはchallengeがレスポンスに含まれていません")
         return data['accessToken'], data['challenge']
     except requests.exceptions.RequestException as e:
+        logger.error("HULFT Square認証APIでリクエストエラーが発生しました: %s", e)
+        raise
+    except ValueError as ve:
+        logger.error("HULFT Square認証APIのレスポンスエラー: %s", ve)
         raise
 
 def update_refresh_token(access_token):
     """アクセストークンを使いリフレッシュトークンを更新"""
     url = 'https://app.square.hulft.com/v1/rest-api-token'
-    body = {
-        "refreshToken": os.environ.get("HSQ_REFRESH_TOKEN") 
-    }
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {access_token}'
     }
     try:
-        response = requests.post(url, json=body, headers=headers, verify=False)
+        response = requests.post(url, headers=headers, verify=False, timeout=30)
         response.raise_for_status()
         data = response.json()
         return data['accessToken']
     except requests.exceptions.RequestException as e:
         raise
 
-# HULFT Squareジョブ
-# def invoke_hsq_llm_api(channel, thread_ts, slack_user_id, cache_use_flag,
-#                        ai_service, ai_model, ai_temperature, bot_token):
-#def invoke_hsq_llm_api(access_token,channel):
-def invoke_hsq_llm_api(access_token,channelId):
-    """HULFT Squareジョブを実行"""
-    url = 'https://a00001-21.square.hulft.com/PMAssistant/pmademo'
-    body = {
-        # 'prompt': prompt,
-        'channelId': channelId
-        # 'thread_ts': thread_ts,
-        # 'slack_user_id': slack_user_id,
-        # 'cache_use_flag': cache_use_flag,
-        # 'ai_service': ai_service,
-        # 'ai_model': ai_model,
-        # 'ai_temperature': ai_temperature,
-        # 'bot_token': bot_token
-    }
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {access_token}',
-        'X-HSQ-Async': 'true'
-    }
-    try:
-        response = requests.post(url, json=body, headers=headers)
-        response.raise_for_status()
-        return response
-    except requests.exceptions.RequestException as e:
-        raise 
-
-# # Slack API実行用メソッド
-# def _get_user_profile_by_slack_user_id(client, user_id: str):
-#     """SlackのユーザーIDからユーザー情報を取得します。"""
-#     if not user_id:
-#         return None
-
-#     user_info = client.users_info(user=user_id)
-#     return user_info["user"]["profile"]
-
-# @app.message("こんにちは")
-# def message_hello(message, say):
-#     # イベントがトリガーされたチャンネルへ say() でメッセージを送信します
-#     say(f"PMアシスタントを起動しました。少々お待ちください。")
 
 def invoke_hsq_translation_api(
     access_token: str,
+    execution_user: str,
     audio_file_box_id: str,
-    audio_file_name: str,
     input_container_sas_url: str,
     output_container_sas_url: str,
     slack_channel_id: str,
@@ -156,8 +126,8 @@ def invoke_hsq_translation_api(
 
     Args:
         access_token (str): Bearerトークン
-        audio_file_box_id (str): BoxのファイルID
-        audio_file_name (str): 音声ファイル名
+        execution_user (str): 実行ユーザー名
+        audio_file_box_id (str): 音声ファイルのBoxId。https://sisco001.ent.box.com/file/'BoxId'の'BoxId'部分
         input_container_sas_url (str): 入力先コンテナのSAS URL
         output_container_sas_url (str): 出力先コンテナのSAS URL
         slack_channel_id (str): SlackチャンネルID
@@ -167,16 +137,16 @@ def invoke_hsq_translation_api(
     Returns:
         dict: APIレスポンスのJSON
     """
-    import requests
 
-    url = "https://a00001-21.square.hulft.com/PMAssistant/pmassistant"
+    url = "https://a00001-21.square.hulft.com/PMAssistant-dev/pmassistant"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}"
+        "Authorization": f"Bearer {access_token}",
+        "X-HSQ-Async": "true"
     }
     body = {
+        "executionUser": execution_user,
         "audioFileBoxId": audio_file_box_id,
-        "audioFileName": audio_file_name,
         "inputContainerSasUrl": input_container_sas_url,
         "outputContainerSasUrl": output_container_sas_url,
         "slackChannelId": slack_channel_id,
@@ -185,19 +155,19 @@ def invoke_hsq_translation_api(
     }
 
     try:
-        response = requests.post(url, json=body, headers=headers)
+        response = requests.post(url, data=json.dumps(body), headers=headers, verify=False, timeout=30)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         # パラメータの存在を確認
-        import logging
+        
         missing_params = []
         if not access_token:
             missing_params.append("access_token")
+        if not execution_user:
+            missing_params.append("execution_user")
         if not audio_file_box_id:
             missing_params.append("audio_file_box_id")
-        if not audio_file_name:
-            missing_params.append("audio_file_name")
         if not input_container_sas_url:
             missing_params.append("input_container_sas_url")
         if not output_container_sas_url:
@@ -215,10 +185,6 @@ def ex_get_container_sas_url(container_name: str):
     Azure Storageの指定されたコンテナのSAS URLを取得します。
     発行URLに対して"&restype=container&comp=list"を付記するとLIST形式で参照可能です。
     """
-
-    # 存在チェック
-    if container_name is None:
-        raise ValueError("container_name is required")
         
     # 環境変数から値を取得
     account_name = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME")
@@ -238,7 +204,7 @@ def ex_get_container_sas_url(container_name: str):
         container_name=container_name
     )
 
-# イベントハンドラ
+
 @app.command("/pmassistant_form_open")
 def post_pm_assistant_form_open_button_message(ack, say) -> None:
     """
@@ -262,53 +228,34 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
     ack()
 
+    # 実行ユーザー
     slack_user = body["user"]
     slack_user_name = slack_user["name"]
 
-    # システムユーザーID（メンバーから除外）
+    # システムユーザーID（メンバーから除外）★要検討
     system_user_id = "U0943JQLEER"
 
-    # SAS URL取得
+    # 入力（audio）・出力（transcriptions）コンテナのSAS URL取得
     audio_container_sas_url = ex_get_container_sas_url("audio")
     transcriptions_container_sas_url = ex_get_container_sas_url("transcriptions")
-    print(f"audio_container_sas_url: {audio_container_sas_url}")
-    print(f"transcriptions_container_sas_url: {transcriptions_container_sas_url}")
 
     try:
         # チャンネルIDを取得
         channel_id = body.get("channel", {}).get("id")
+
         member_ids = []
+        # チャンネル情報とメンバー情報をログ出力（任意で残す場合）
         if channel_id:
             try:
                 # チャンネルメンバーの取得
                 members_info = client.conversations_members(channel=channel_id)
 
-                print(f"members_info: {members_info}")
-
                 member_ids = members_info.get("members", [])
                 # システムユーザー名を除外
                 member_ids = [member_id for member_id in member_ids if member_id != system_user_id]
+
             except Exception as e:
                 logger.warning("チャンネルメンバー取得時に例外が発生しました: %s", e)
-        else:
-            logger.info("チャンネルIDが取得できませんでした。")
-
-        # hidden値をjsonにまとめて次の画面に渡す
-        hidden_values = {
-            "audio_container_sas_url": audio_container_sas_url,
-            "transcriptions_container_sas_url": transcriptions_container_sas_url,
-            "channel_id": channel_id
-        }
-        # pm_assistant_form_blockにメンバーIDリストを渡す
-        # trigger_idは一度だけ使用可能
-        client.views_open(
-            trigger_id=body["trigger_id"],
-            view=pm_assistant_form_block(slack_user["id"], member_ids, hidden_values),
-        )
-        logger.info("%s によってPMアシスタント投稿フォームが開かれました。", slack_user_name)
-
-        # チャンネル情報とメンバー情報をログ出力（任意で残す場合）
-        if channel_id:
             try:
                 # チャンネル情報の取得
                 try:
@@ -323,35 +270,56 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
                 for member_id in member_ids:
                     try:
                         user_info = client.users_info(user=member_id)
-                        display_name = user_info["user"]["profile"].get("display_name") or user_info["user"]["name"]
-                        member_details.append(f"{member_id} ({display_name})")
+                        # 取得しやすい形式で表示名を取得（display_nameがあればそれを、なければreal_name、なければname）
+                        user = user_info.get("user", {})
+                        display_name = user.get("name", "")
+                        member_details.append({"id": member_id, "display_name": display_name})
                     except Exception as e:
-                        member_details.append(f"{member_id} (名前取得失敗)")
+                        member_details.append({"id": member_id, "display_name": "名前取得失敗"})
                         logger.warning("ユーザー情報取得時に例外が発生しました: %s", e)
                 logger.info("チャンネル参加メンバー一覧: %s", member_details)
 
             except Exception as e:
                 logger.exception("チャンネル情報またはメンバー取得時に予期せぬ例外が発生しました: %s", e)
 
+
+
+        else:
+            logger.info("チャンネルIDが取得できませんでした。")
+
+        # hidden値をjsonにまとめて次の画面に渡す
+        hidden_values = {
+            "audio_container_sas_url": audio_container_sas_url,
+            "transcriptions_container_sas_url": transcriptions_container_sas_url,
+            "channel_id": channel_id,
+            "member_details": member_details
+        }
+        # pm_assistant_form_blockにメンバーIDリストを渡す
+        # trigger_idは一度だけ使用可能
+        client.views_open(
+            trigger_id=body["trigger_id"],
+            view=pm_assistant_form_block(slack_user["id"], member_ids, hidden_values),
+        )
+        logger.info("%s によってPMアシスタント投稿フォームが開かれました。", slack_user_name)
+
     except Exception:
         logger.exception(
             "%s によるPMアシスタント投稿フォーム呼び出し時に例外が発生しました。",
             slack_user_name
         )
-        
+
 
 @app.view("pm_assistant_form")
 def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger):
     """
-    Slack上の入力フォーム上で"チェック"が選択された場合、入力情報をパラメータとしてHULFTSquareのジョブ起動エンドポイントにリクエストを発行します。
+    Slack上の入力フォーム上で"チェック"が選択された場合、
+    入力情報をパラメータとしてHULFTSquareのジョブ起動エンドポイントにリクエストを発行します。
     """
     ack()
 
     logger.info("PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
-
     
     slack_user = body["user"]
-    
     
     # 各変数を定義
     view_state = view["state"]["values"]
@@ -363,76 +331,107 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     box_file_path = view_state["box_url"][list(view_state["box_url"].keys())[0]]["value"]
     # private_metadataのパース
     
-    # "https://sisco001.ent.box.com/file/1860511521190?s=acq6wu4mwew7wedsilyb93r41fbvopmk"のs=以降の文字列を取得
-    box_file_id = box_file_path.split("s=")[-1]
-
-    audio_file_name = "test" # おそらく取得できないので仮で
+    # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
+    box_file_id = box_file_path.split('/')[-1]
+    if DEBUG_MODE:
+        logger.info(f"box_file_id: {box_file_id}")
 
     private_metadata = json.loads(view.get("private_metadata", "{}"))
     audio_container_sas_url = private_metadata.get("audio_container_sas_url")
     transcriptions_container_sas_url = private_metadata.get("transcriptions_container_sas_url")
     channel_id_from_metadata = private_metadata.get("channel_id")
-
-
-    # def find_by_block_id(block_id: str) -> dict:
-    #     """Block IDから入力された値を取得します。"""
-    #     return list(view["state"]["values"][block_id].values())[0]
+    member_details = private_metadata.get("member_details")
 
     try:
-
         #1.slackにメッセージ送信
-        post_user_id = body["user"]["id"]
-        #post_user_profile = _get_user_profile_by_slack_user_id(client, post_user_id)
         client.chat_postMessage(
             channel=channel_id_from_metadata,
-            text="PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"        
-            )
-
+            text="PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
+        )
         
         #2 HSQトークン取得
         access_token, challenge = get_access_token()
         new_access_token = update_refresh_token(access_token)
+        print(f"new_access_token: {new_access_token}")
 
-        # print(f"access_token: {access_token}")
-        # print(f"new_access_token: {new_access_token}")
+        if DEBUG_MODE:
+            # 上のメッセージ送信形式に合わせて日本語で統一
+            client.chat_postMessage(
+                channel=channel_id_from_metadata,
+                text=(
+                    "HULFT Squareのトークンを取得しました。\n"
+                    "----------------------------------------\n"
+                    f"access_token（文字数）: `{len(access_token)}`\n"
+                    "----------------------------------------\n"
+                )
+            )
 
-        # print(f"box_file_id: {box_file_id}")
-        # print(f"audio_file_name: {audio_file_name}")
-        # print(f"audio_container_sas_url: {audio_container_sas_url}")
-        # print(f"transcriptions_container_sas_url: {transcriptions_container_sas_url}")
-        # print(f"channel_id_from_metadata: {channel_id_from_metadata}")
-        # print(f"member_ids: {member_ids}")
-        # print(f"agenda_text: {agenda_text}")
+        if DEBUG_MODE:
+            client.chat_postMessage(
+                channel=channel_id_from_metadata,
+                text=(
+                    "SAS URLを取得しました。\n"
+                    "----------------------------------------\n"
+                    f"audioコンテナSAS URL: {audio_container_sas_url}\n"
+                    f"transcriptionsコンテナSAS URL: {transcriptions_container_sas_url}\n"
+                    "----------------------------------------\n"
+                )
+            )
 
-        # tokenは取得成否として、その他のパラメータはjsonにセットしてlog出力
-        log_body = {
-            "access_token": access_token,
-            "new_access_token": new_access_token,
-            "box_file_id": box_file_id,
-            "audio_file_name": audio_file_name,
-            "audio_container_sas_url": audio_container_sas_url,
-            "transcriptions_container_sas_url": transcriptions_container_sas_url,
-            "channel_id_from_metadata": channel_id_from_metadata,
-            "member_ids": member_ids,
-            "agenda_text": agenda_text
-        }
-        logger.info(f"log_body: {log_body}")
+        slack_channel_menbers = [member["display_name"] for member in member_details]
+        if DEBUG_MODE:
+            client.chat_postMessage(
+                channel=channel_id_from_metadata,
+                text=(
+                    "入力情報を取得しました。\n"
+                    "----------------------------------------\n"
+                    f"box_file_id: {box_file_id}\n"
+                    f"execution_user: {slack_user["name"]}\n"
+                    f"channel_id: {channel_id_from_metadata}\n"
+                    f"slack_channel_menbers: {slack_channel_menbers}\n"
+                    f"agenda_text: {agenda_text}\n"
+                    "----------------------------------------\n"
+                )
+            )
 
-        # #3.HULFT Squareのジョブを叩く
-        # res = invoke_hsq_translation_api(
-        #     access_token=access_token,
-        #     audio_file_box_id=box_file_id,
-        #     audio_file_name=audio_file_name,
-        #     input_container_sas_url=audio_container_sas_url,
-        #     output_container_sas_url=transcriptions_container_sas_url,
-        #     slack_channel_id=channel_id_from_metadata,
-        #     slack_channel_member=member_ids,
-        #     option=agenda_text
-        # )
+        #3.HULFT Squareのジョブを叩く
+        #文字列に変換
+        slack_channel_members_str = ", ".join(slack_channel_menbers)
+        print(f"slack_channel_members_str: {slack_channel_members_str}")
 
-        logger.info("PMアシスタントAI機能が終了しました。")
+        res = invoke_hsq_translation_api(
+            access_token=new_access_token,
+            # new_access_token=refresh_token,
+            audio_file_box_id=box_file_id,
+            execution_user=slack_user["name"],
+            input_container_sas_url=audio_container_sas_url,
+            output_container_sas_url=transcriptions_container_sas_url,
+            slack_channel_id=channel_id_from_metadata,
+            slack_channel_member=slack_channel_members_str,
+            option=agenda_text
+        )
+        # print(f"res: {res}")
+
+        if DEBUG_MODE:
+            client.chat_postMessage(
+                channel=channel_id_from_metadata,
+                text="リクエストパラメーターは以下の通りです。\n"
+                f"access_token: {new_access_token}\n"
+                f"audio_file_box_id: {box_file_id}\n"
+                f"execution_user: {slack_user["name"]}\n"
+                f"input_container_sas_url: {audio_container_sas_url}\n"
+                f"output_container_sas_url: {transcriptions_container_sas_url}\n"
+                f"slack_channel_id: {channel_id_from_metadata}\n"
+                f"slack_channel_member: {slack_channel_members_str}\n"
+                f"option: {agenda_text}\n"
+            )  
+
+        client.chat_postMessage(
+            channel=channel_id_from_metadata,
+            text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
+        )        
     except:
-        logger.exception("PMアシスタントAI機能実行時に例外が発生しました。")
+        logger.exception("炎上リスク分析機能実行時に例外が発生しました。")
 
 # Socket Modeハンドラーを実行する関数
 def run_socket_mode():

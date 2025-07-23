@@ -73,7 +73,7 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                         "type": "plain_text", 
                         "text": " "
                         },
-                    "initial_users": member_details,
+                    "initial_users": [member["id"] for member in member_details] if member_details and isinstance(member_details[0], dict) and "id" in member_details[0] else member_details,
                     #"max_selected_items": 10,
                 },
                 "label": {
@@ -102,7 +102,7 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                 },
                 "hint": {
                     "type": "plain_text",
-                    "text": "例: https://sisco001.ent.box.com/file/ファイル名.mp4\n※ローカルパス (C:/Users/...) は使用できません。",
+                    "text": "例: https://sisco001.ent.box.com/file/s/xxxxxxxxxx\n※ローカルパス (C:/Users/...) は使用できません。",
                 },
             },
             {
