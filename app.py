@@ -324,7 +324,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     # 各変数を定義
     view_state = view["state"]["values"]
     # プロジェクトメンバー（ユーザーIDリスト）
-    member_ids = view_state["member_name"][list(view_state["member_name"].keys())[0]]["selected_users"]
+    # member_ids = view_state["member_name"][list(view_state["member_name"].keys())[0]]["selected_users"]
     # MTGアウトライン（テキスト）
     agenda_text = view_state["agenda"][list(view_state["agenda"].keys())[0]]["value"]
     # Boxファイルパス（テキスト）
