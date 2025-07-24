@@ -108,12 +108,13 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
             {
                 "block_id": "agenda",
                 "type": "input",
+                "optional": True, # True = 任意
                 "element": {
                     "type": "plain_text_input",
                     "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "例.\n1. 変更管理の追加費用について合意する\n2. 6月中に検収する方針で合意する\n3. 運用方針について説明して理解いただく",
+                        "text": "例.\n1. 変更管理の追加費用について合意する\n2. 6月中に検収する方針で合意する\n3. UIの仕様を確定させる",
                     },
                 },
                 "label": {
