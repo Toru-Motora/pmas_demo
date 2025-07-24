@@ -21,7 +21,7 @@ PMアシスタントは、会議の録音データを分析し、会議のサマ
 - `AZURE_STORAGE_ACCOUNT_NAME`: Azure Storageアカウント名
 - `AZURE_STORAGE_ACCOUNT_KEY`: Azure Storageアカウントキー
 - `HSQ_SIGNING_SECRET`: HULFT Square認証用パスワード
-- `AZURE_WEBAPP_MODE`: Azure Web Appモードで実行する場合は "true" に設定
+- `AZURE_WEBAPP_MODE`: Azure Web Appモードで実行する場合は "true" に設定（それ以外は従来のSocket Modeのみ）
 
 ### Slack権限
 
