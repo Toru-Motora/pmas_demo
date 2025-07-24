@@ -98,12 +98,12 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": ":white_check_mark:打合せの音声/録画ファイル"
+                    "text": ":white_check_mark:打合せの音声/録画ファイル(m4a/mp4形式)"
                 },
-                "hint": {
-                    "type": "plain_text",
-                    "text": "例: https://sisco001.ent.box.com/file/s/xxxxxxxxxx\n※ローカルパス (C:/Users/...) は使用できません。",
-                },
+                # "hint": {
+                #     "type": "plain_text",
+                #     "text": "例: https://sisco001.ent.box.com/file/s/xxxxxxxxxx\n※ローカルパス (C:/Users/...) は使用できません。",
+                # },
             },
             {
                 "block_id": "agenda",
@@ -113,16 +113,16 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                     "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "例.\n1. Fit&Gapでの検討事項の共有\n2. ヒアリングシートの確認\n3. デモ環境の説明など",
+                        "text": "例.\n1. 変更管理の追加費用について合意する\n2. 6月中に検収する方針で合意する\n3. 運用方針について説明して理解いただく",
                     },
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": ":white_check_mark: MTGアウトライン"
+                    "text": ":white_check_mark: 個別分析エリア"
                     },
                 "hint": {
                     "type": "plain_text",
-                    "text": "MTGアウトライン（当初の計画）を入力してください",
+                    "text": "個別に状況分析を行います。打合せで実施予定の事柄がある場合は1行単位で入力してください。",
                 },
             },
             # {
