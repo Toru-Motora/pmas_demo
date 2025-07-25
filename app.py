@@ -1,6 +1,8 @@
 import os
 import logging
 import json
+import sys
+import traceback
 import re
 from pickle import TRUE
 from sys import addaudithook
@@ -49,8 +51,8 @@ flask_app = Flask(__name__)
 def home():
     return jsonify({
         "status": "running",
-        "app": "PMアシスタント",
-        "description": "PMアシスタントアプリが実行中です"
+        "app": "炎上リスク分析",
+        "description": "炎上リスク分析アプリが実行中です"
     })
 
 @flask_app.route("/health")
@@ -215,7 +217,7 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 
     say(
         {
-            "text": "PMアシスタント用メッセージ",
+            "text": "炎上リスク分析用メッセージ",
             "blocks": pm_assistant_form_open_button_block(),
         }
     )
@@ -224,16 +226,13 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 @app.action("pma-form-open-submit-button")
 def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
-    Slackチャンネル上でPMアシスタントAIボタンが押された場合、入力フォームを開きます。
+    Slackチャンネル上で炎上リスク分析ボタンが押された場合、入力フォームを開きます。
     """
     ack()
 
     # 実行ユーザー
     slack_user = body["user"]
     slack_user_name = slack_user["name"]
-
-    # システムユーザーID（メンバーから除外）★要検討
-    system_user_id = "U0943JQLEER"
 
     # 入力（audio）・出力（transcriptions）コンテナのSAS URL取得
     audio_container_sas_url = ex_get_container_sas_url("audio")
@@ -249,11 +248,8 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
             try:
                 # チャンネルメンバーの取得
                 members_info = client.conversations_members(channel=channel_id)
-
                 member_ids = members_info.get("members", [])
-                # システムユーザー名を除外
-                member_ids = [member_id for member_id in member_ids if member_id != system_user_id]
-
+                
             except Exception as e:
                 logger.warning("チャンネルメンバー取得時に例外が発生しました: %s", e)
             try:
@@ -300,11 +296,11 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
             trigger_id=body["trigger_id"],
             view=pm_assistant_form_block(slack_user["id"], member_ids, hidden_values),
         )
-        logger.info("%s によってPMアシスタント投稿フォームが開かれました。", slack_user_name)
+        logger.info("%s によって炎上リスク分析投稿フォームが開かれました。", slack_user_name)
 
     except Exception:
         logger.exception(
-            "%s によるPMアシスタント投稿フォーム呼び出し時に例外が発生しました。",
+            "%s による炎上リスク分析投稿フォーム呼び出し時に例外が発生しました。",
             slack_user_name
         )
 
@@ -317,24 +313,19 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     """
     ack()
 
-    logger.info("PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
+    logger.info("炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
     
     slack_user = body["user"]
     
     # 各変数を定義
     view_state = view["state"]["values"]
-    # プロジェクトメンバー（ユーザーIDリスト）
-    # member_ids = view_state["member_name"][list(view_state["member_name"].keys())[0]]["selected_users"]
     # MTGアウトライン（テキスト）
     agenda_text = view_state["agenda"][list(view_state["agenda"].keys())[0]]["value"]
     # Boxファイルパス（テキスト）
     box_file_path = view_state["box_url"][list(view_state["box_url"].keys())[0]]["value"]
     # private_metadataのパース
     
-    # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
-    box_file_id = box_file_path.split('/')[-1]
-    if DEBUG_MODE:
-        logger.info(f"box_file_id: {box_file_id}")
+
 
     private_metadata = json.loads(view.get("private_metadata", "{}"))
     audio_container_sas_url = private_metadata.get("audio_container_sas_url")
@@ -346,16 +337,16 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         #1.slackにメッセージ送信
         client.chat_postMessage(
             channel=channel_id_from_metadata,
-            text="PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
+            text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
         )
         
-        logger.info(f"メッセージ送信実行、処理開始")
+        logger.info("メッセージ送信実行、処理開始")
         #2 HSQトークン取得
         access_token, challenge = get_access_token()
         new_access_token = update_refresh_token(access_token)
         print(f"new_access_token: {new_access_token}")
 
-        logger.info(f"HULFT Squareのトークン取得完了")
+        logger.info("HULFT Squareのトークン取得完了")
 
         if DEBUG_MODE:
             # 上のメッセージ送信形式に合わせて日本語で統一
@@ -380,8 +371,26 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
                     "----------------------------------------\n"
                 )
             )
+        logger.info("入力情報取得完了")
 
-        logger.info(f"入力情報取得完了")
+        # 入力データbox_file_pathのバリデーション
+        box_domain = "https://sisco001.ent.box.com/file"
+
+        # https://sisco001.ent.box.com/file以外ならエラー
+        if not box_file_path.startswith(box_domain):
+            raise ValueError("入力されたリンクが不正です。\n"
+                             f"※'{box_domain}/XXXXX'の形式で入力してください。")
+        
+        # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
+        box_file_id = box_file_path.split('/')[-1]
+
+        # "xxx.com/file/1934340618266?s=cxmxwccaqmbdzjpnhe80wtbtw25bwc59"のように、パラメータありの場合はパラメータを削除
+        # box_file_idもパラメータを除去した形で取得する
+        if "?" in box_file_path:
+            box_file_path = box_file_path.split("?")[0]
+        box_file_id = box_file_path.split('/')[-1]
+        logger.info(f"BOX ID取得完了: {box_file_id}")
+
 
         slack_channel_menbers = [member["display_name"] for member in member_details]
         if DEBUG_MODE:
@@ -404,7 +413,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         slack_channel_members_str = ", ".join(slack_channel_menbers)
         print(f"slack_channel_members_str: {slack_channel_members_str}")
 
-        logger.info(f"HULFT Squareのジョブ実行開始")
+        logger.info("HULFT Squareのジョブ実行開始")
 
         res = invoke_hsq_translation_api(
             access_token=new_access_token,
@@ -417,7 +426,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
             slack_channel_member=slack_channel_members_str,
             option=agenda_text
         )
-        logger.info(f"HULFT Squareのジョブ実行完了")
+        logger.info("HULFT Squareのジョブ実行完了")
 
         if DEBUG_MODE:
             client.chat_postMessage(
@@ -438,11 +447,24 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
             text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
         )       
 
-        logger.info(f"炎上リスク分析機能実行完了")
+        logger.info("炎上リスク分析機能実行完了")
     except:
-        logger.exception("炎上リスク分析機能実行時に例外が発生しました。")
+        # エラーメッセージを画面に渡す
+        exc_type, exc_value, _ = sys.exc_info()
+        error_message = str(exc_value)
+        
+        client.chat_postMessage(
+            channel=channel_id_from_metadata,
+            text=f"\n 【エラー】炎上リスク分析機能実行処理を中断しました。\n理由：\n{error_message}\n"
+        )
 
-# Socket Modeハンドラーを実行する関数
+        logger.exception("炎上リスク分析機能実行時に例外が発生しました。")
+        
+
+# Socket Mode（SlackとのWebSocket通信）を開始するための関数
+# Slack BoltのSocketModeHandlerを使い、appインスタンスとapp_tokenで
+# リアルタイムなイベント受信・送信を可能にします。
+# trace_enabled=Trueで詳細ログ、auto_reconnect_enabled=Trueで自動再接続を有効化しています。
 def run_socket_mode():
     handler = SocketModeHandler(
         app=app,
@@ -454,10 +476,15 @@ def run_socket_mode():
 
 if __name__ == "__main__":
     # 環境変数に基づいて実行モードを切り替え
-    # AZURE_WEBAPP_MODE が設定されている場合はハイブリッドモード、それ以外は従来のSocket Modeのみ
+    # ※ ローカルだとwebsocket通信（Socket Mode）が使えて、WebApp（Azure Web App）だと使えない事象があった
+    # ・ローカル環境では、アプリケーションが直接外部とWebSocket通信を確立できるためSocket Modeが利用可能
+    # ・一方、Azure Web AppなどのPaaS環境では、外部からのWebSocket通信が制限されていたり、
+    # 　プロキシやロードバランサーの影響でソケット通信が安定して確立できない場合が多い。
+    # ・そのため、WebApp環境ではHTTPリクエスト（Events API）を受け付けるFlaskサーバーも併用する「ハイブリッドモード」を実装
     is_azure_webapp = os.environ.get("AZURE_WEBAPP_MODE", "").lower() == "true"
     
     if is_azure_webapp:
+        # Azure Web App モードで起動（ハイブリッドモード）
         logger.info("Azure Web App モードで起動しています")
         # Socket Modeを別スレッドで実行
         socket_thread = Thread(target=run_socket_mode)
@@ -468,6 +495,7 @@ if __name__ == "__main__":
         port = int(os.environ.get("PORT", 8000))
         flask_app.run(host="0.0.0.0", port=port)
     else:
+        # ローカル環境上の実行
         logger.info("ローカルモードで起動しています。")
         # 従来通りSocket Modeのみで実行
         run_socket_mode()
