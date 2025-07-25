@@ -1,6 +1,8 @@
 import os
 import logging
 import json
+import sys
+import traceback
 import re
 from pickle import TRUE
 from sys import addaudithook
@@ -49,8 +51,8 @@ flask_app = Flask(__name__)
 def home():
     return jsonify({
         "status": "running",
-        "app": "PMアシスタント",
-        "description": "PMアシスタントアプリが実行中です"
+        "app": "炎上リスク分析",
+        "description": "炎上リスク分析アプリが実行中です"
     })
 
 @flask_app.route("/health")
@@ -215,7 +217,7 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 
     say(
         {
-            "text": "PMアシスタント用メッセージ",
+            "text": "炎上リスク分析用メッセージ",
             "blocks": pm_assistant_form_open_button_block(),
         }
     )
@@ -224,7 +226,7 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 @app.action("pma-form-open-submit-button")
 def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
-    Slackチャンネル上でPMアシスタントAIボタンが押された場合、入力フォームを開きます。
+    Slackチャンネル上で炎上リスク分析ボタンが押された場合、入力フォームを開きます。
     """
     ack()
 
@@ -246,7 +248,6 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
             try:
                 # チャンネルメンバーの取得
                 members_info = client.conversations_members(channel=channel_id)
-
                 member_ids = members_info.get("members", [])
                 
             except Exception as e:
@@ -295,11 +296,11 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
             trigger_id=body["trigger_id"],
             view=pm_assistant_form_block(slack_user["id"], member_ids, hidden_values),
         )
-        logger.info("%s によってPMアシスタント投稿フォームが開かれました。", slack_user_name)
+        logger.info("%s によって炎上リスク分析投稿フォームが開かれました。", slack_user_name)
 
     except Exception:
         logger.exception(
-            "%s によるPMアシスタント投稿フォーム呼び出し時に例外が発生しました。",
+            "%s による炎上リスク分析投稿フォーム呼び出し時に例外が発生しました。",
             slack_user_name
         )
 
@@ -312,7 +313,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     """
     ack()
 
-    logger.info("PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
+    logger.info("炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
     
     slack_user = body["user"]
     
@@ -324,10 +325,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     box_file_path = view_state["box_url"][list(view_state["box_url"].keys())[0]]["value"]
     # private_metadataのパース
     
-    # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
-    box_file_id = box_file_path.split('/')[-1]
-    if DEBUG_MODE:
-        logger.info(f"box_file_id: {box_file_id}")
+
 
     private_metadata = json.loads(view.get("private_metadata", "{}"))
     audio_container_sas_url = private_metadata.get("audio_container_sas_url")
@@ -339,7 +337,7 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         #1.slackにメッセージ送信
         client.chat_postMessage(
             channel=channel_id_from_metadata,
-            text="PMアシスタントAI機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
+            text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
         )
         
         logger.info("メッセージ送信実行、処理開始")
@@ -373,8 +371,26 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
                     "----------------------------------------\n"
                 )
             )
-
         logger.info("入力情報取得完了")
+
+        # 入力データbox_file_pathのバリデーション
+        box_domain = "https://sisco001.ent.box.com/file"
+
+        # https://sisco001.ent.box.com/file以外ならエラー
+        if not box_file_path.startswith(box_domain):
+            raise ValueError("入力されたリンクが不正です。\n"
+                             f"※'{box_domain}/XXXXX'の形式で入力してください。")
+        
+        # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
+        box_file_id = box_file_path.split('/')[-1]
+
+        # "xxx.com/file/1934340618266?s=cxmxwccaqmbdzjpnhe80wtbtw25bwc59"のように、パラメータありの場合はパラメータを削除
+        # box_file_idもパラメータを除去した形で取得する
+        if "?" in box_file_path:
+            box_file_path = box_file_path.split("?")[0]
+        box_file_id = box_file_path.split('/')[-1]
+        logger.info(f"BOX ID取得完了: {box_file_id}")
+
 
         slack_channel_menbers = [member["display_name"] for member in member_details]
         if DEBUG_MODE:
@@ -433,6 +449,15 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
 
         logger.info("炎上リスク分析機能実行完了")
     except:
+        # エラーメッセージを画面に渡す
+        exc_type, exc_value, _ = sys.exc_info()
+        error_message = str(exc_value)
+        
+        client.chat_postMessage(
+            channel=channel_id_from_metadata,
+            text=f"\n 【エラー】炎上リスク分析機能実行処理を中断しました。\n理由：\n{error_message}\n"
+        )
+
         logger.exception("炎上リスク分析機能実行時に例外が発生しました。")
         
 
