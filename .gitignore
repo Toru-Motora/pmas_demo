@@ -56,3 +56,6 @@ Thumbs.db
 credentials.json
 *_key.json
 *_secret.json 
+
+# slack
+./slack/_pycache_/
