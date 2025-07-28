@@ -15,9 +15,9 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
     return {
         "type": "modal",
         "callback_id": "pm_assistant_form",
-        "title": {"type": "plain_text", "text": "炎上リスクをチェック"},
-        "submit": {"type": "plain_text", "text": "チェック"},
-        "close": {"type": "plain_text", "text": "閉じる"},
+        "title": {"type": "plain_text", "text": "プロジェクトリスク評価"},
+        "submit": {"type": "plain_text", "text": "実行"},
+        "close": {"type": "plain_text", "text": "終了する"},
         "private_metadata": json.dumps(json_body),
         "blocks": [
             # {
@@ -48,18 +48,18 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                     "type": "plain_text_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "Box上の録画/音声ファイルの共有リンク(URL)を入力",
+                        "text": "https://sisco001.ent.box.com/file/xxxxxxxxxx",
                     },
                     "action_id": "box_file_path",
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": ":white_check_mark:打合せの音声/録画ファイル(m4a/mp4形式)"
+                    "text": "Boxリンク"
                 },
-                # "hint": {
-                #     "type": "plain_text",
-                #     "text": "例: https://sisco001.ent.box.com/file/s/xxxxxxxxxx\n※ローカルパス (C:/Users/...) は使用できません。",
-                # },
+                "hint": {
+                    "type": "plain_text",
+                    "text": "打ち合わせの録音ファイル（m4a形式）をBoxで表示し、ブラウザで表示されたURLを貼り付けてください。",
+                },
             },
             {
                 "block_id": "agenda",
@@ -70,16 +70,16 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                     "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "例.\n1. 変更管理の追加費用について合意する\n2. 6月中に検収する方針で合意する\n3. UIの仕様を確定させる",
+                        "text": "変更管理の追加費用について合意する\n6月中に検収する方針で合意する\nUIの仕様を確定する",
                     },
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": ":white_check_mark: 個別分析エリア"
+                    "text": "個別評価項目"
                     },
                 "hint": {
                     "type": "plain_text",
-                    "text": "個別に状況分析を行います。打合せで実施予定の事柄がある場合は1行単位で入力してください。",
+                    "text": "基本分析に加えて、ここに入力された項目をPMアシスタントが個別に評価します。確認したい観点を1行に1つずつ入力してください。",
                 },
             },
         ],

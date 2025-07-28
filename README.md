@@ -21,7 +21,7 @@ PMアシスタントは、会議の録音データを分析し、会議のサマ
 - `AZURE_STORAGE_ACCOUNT_NAME`: Azure Storageアカウント名
 - `AZURE_STORAGE_ACCOUNT_KEY`: Azure Storageアカウントキー
 - `HSQ_SIGNING_SECRET`: HULFT Square認証用パスワード
-- `AZURE_WEBAPP_MODE`: Azure Web Appモードで実行する場合は "true" に設定
+- `AZURE_WEBAPP_MODE`: Azure Web Appモードで実行する場合は "true" に設定（それ以外は従来のSocket Modeのみ）
 
 ### Slack権限
 
@@ -102,21 +102,6 @@ HULFT Squareと連携して以下の処理を行います：
 
 2. API呼び出し
    - `invoke_hsq_translation_api()`: 音声ファイル変換APIを呼び出し
-
-## トラブルシューティング
-
-- **SAS URL認証エラー**: アカウントキーが最新であることを確認し、時刻のずれを考慮して開始時間を現在時刻より5分前に設定
-- **Slack権限エラー**: 必要な権限がすべて付与されていることを確認
-- **HULFT Square認証エラー**: 
-  - アクセストークンが有効であることを確認
-  - 401 Unauthorized エラーの場合、トークンが無効または期限切れの可能性があります
-  - リクエストパラメータの形式を確認（特に配列を文字列に変換しているか）
-- **データ型エラー**: 
-  - `slack_channel_member`パラメータが文字列形式であることを確認
-  - 配列データを送信する場合は、適切に文字列に変換（例: `", ".join(array)`）
-- **フォーム送信エラー**:
-  - `KeyError: 'member_name'`などのエラーが発生した場合は、フォーム定義（`pm_assistant_form_block.py`）と処理コード（`app.py`）の整合性を確認してください
-  - フォームフィールドがコメントアウトされている場合、対応する処理コードもコメントアウトする必要があります
 
 ## デバッグモード
 

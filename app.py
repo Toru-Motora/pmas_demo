@@ -207,13 +207,16 @@ def ex_get_container_sas_url(container_name: str):
     )
 
 
-@app.command("/pmassistant_form_open")
+# @app.command("/pmassistant_form_open")
+@app.command("/pmassistant_form")
 def post_pm_assistant_form_open_button_message(ack, say) -> None:
     """
     /pmassistant_form コマンドが実行された場合、フォームを開くボタンを含んだメッセージを送信します。
     member_joined_channel イベントで実行しようとしていましたが、イベントが発火せず、原因不明のためコマンドにしています。
     """
     ack()
+
+    logger.info("コマンドが実行されました。")
 
     say(
         {
@@ -226,9 +229,11 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 @app.action("pma-form-open-submit-button")
 def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
-    Slackチャンネル上で炎上リスク分析ボタンが押された場合、入力フォームを開きます。
+    Slackチャンネル上で"開始する"ボタンが押された場合、入力フォームを開きます。
     """
     ack()
+
+    logger.info("開始ボタンが押されました。")
 
     # 実行ユーザー
     slack_user = body["user"]
@@ -312,8 +317,6 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     入力情報をパラメータとしてHULFTSquareのジョブ起動エンドポイントにリクエストを発行します。
     """
     ack()
-
-    logger.info("炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…")
     
     slack_user = body["user"]
     
@@ -334,11 +337,8 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     member_details = private_metadata.get("member_details")
 
     try:
-        #1.slackにメッセージ送信
-        client.chat_postMessage(
-            channel=channel_id_from_metadata,
-            text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
-        )
+        #1.処理開始
+        logger.info("炎上リスク分析機能を実行開始")
         
         logger.info("メッセージ送信実行、処理開始")
         #2 HSQトークン取得
@@ -442,12 +442,12 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
                 f"option: {agenda_text}\n"
             )  
 
-        client.chat_postMessage(
-            channel=channel_id_from_metadata,
-            text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
-        )       
+        # client.chat_postMessage(
+        #     channel=channel_id_from_metadata,
+        #     text="炎上リスク分析機能を実行中です:hourglass_flowing_sand:\nしばらくお待ちください…"
+        # )       
 
-        logger.info("炎上リスク分析機能実行完了")
+        logger.info("炎上リスク分析HSQリクエスト完了")
     except:
         # エラーメッセージを画面に渡す
         exc_type, exc_value, _ = sys.exc_info()
