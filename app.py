@@ -16,13 +16,14 @@ from logging import Logger
 import requests
 from lib.getsasurl import get_container_sas_url
 
+
 # ロガーを設定（これにより、Boltの内部ログも表示されやすくなります）
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # UIを含むログ出力モード
-# DEBUG_MODE = True
-DEBUG_MODE = False
+DEBUG_MODE = True
+# DEBUG_MODE = False
 
 # 環境変数からトークンを読み込む
 # xoxb- から始まる Bot User OAuth Token
@@ -114,10 +115,13 @@ def invoke_hsq_translation_api(
     access_token: str,
     execution_user: str,
     audio_file_box_id: str,
+    outline_file_box_id: str,
     input_container_sas_url: str,
     output_container_sas_url: str,
     slack_channel_id: str,
-    slack_channel_member: str,
+    slack_channel_members: str,
+    slack_channel_name: str,
+    outline_number: str,
     option: str = ""
 ):
     """
@@ -133,7 +137,9 @@ def invoke_hsq_translation_api(
         input_container_sas_url (str): 入力先コンテナのSAS URL
         output_container_sas_url (str): 出力先コンテナのSAS URL
         slack_channel_id (str): SlackチャンネルID
-        slack_channel_member (str): Slackチャンネルメンバー（例: '@junichi_kudo @shingo_kawahara @naoto_minagawa'）
+        slack_channel_members (str): Slackチャンネルメンバー（例: '@junichi_kudo @shingo_kawahara @naoto_minagawa'）
+        slack_channel_name (str): Slackチャンネル名
+        box_outline_no (str): ミーティングアウトラインNo
         option (str): 個別指定のPJ分析アウトライン（任意）
 
     Returns:
@@ -149,12 +155,17 @@ def invoke_hsq_translation_api(
     body = {
         "executionUser": execution_user,
         "audioFileBoxId": audio_file_box_id,
+        "outlineFileBoxId": outline_file_box_id,
+        "outlineNumber": outline_number,
         "inputContainerSasUrl": input_container_sas_url,
         "outputContainerSasUrl": output_container_sas_url,
         "slackChannelId": slack_channel_id,
-        "slackChannelMember": slack_channel_member,
+        "slackChannelName": slack_channel_name,
+        "slackChannelMembers": slack_channel_members,        
         "option": option
     }
+
+    print(f"body: {body}")
 
     try:
         response = requests.post(url, data=json.dumps(body), headers=headers, verify=False, timeout=30)
@@ -170,14 +181,20 @@ def invoke_hsq_translation_api(
             missing_params.append("execution_user")
         if not audio_file_box_id:
             missing_params.append("audio_file_box_id")
+        if not outline_file_box_id:
+            missing_params.append("outline_file_box_id")
         if not input_container_sas_url:
             missing_params.append("input_container_sas_url")
         if not output_container_sas_url:
             missing_params.append("output_container_sas_url")
         if not slack_channel_id:
             missing_params.append("slack_channel_id")
-        if not slack_channel_member:
-            missing_params.append("slack_channel_member")
+        if not slack_channel_members:
+            missing_params.append("slack_channel_members")
+        if not slack_channel_name:
+            missing_params.append("slack_channel_name")
+        if not outline_number:
+            missing_params.append("outline_number")
         if missing_params:
             logging.error("以下のパラメータが不足しています: %s", ', '.join(missing_params))
         raise e
@@ -216,7 +233,7 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
     """
     ack()
 
-    logger.info("コマンドが実行されました。")
+    logger.info("pmassistant_form コマンドが実行されました。")
 
     say(
         {
@@ -229,11 +246,11 @@ def post_pm_assistant_form_open_button_message(ack, say) -> None:
 @app.action("pma-form-open-submit-button")
 def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
     """
-    Slackチャンネル上で"開始する"ボタンが押された場合、入力フォームを開きます。
+    Slackチャンネル上で"分析"ボタンが押された場合、入力フォームを開きます。
     """
     ack()
 
-    logger.info("開始ボタンが押されました。")
+    logger.info("分析ボタンが押されました。")
 
     # 実行ユーザー
     slack_user = body["user"]
@@ -293,7 +310,8 @@ def handle_pma_form_open(ack, body, client, logger: Logger) -> None:
             "audio_container_sas_url": audio_container_sas_url,
             "transcriptions_container_sas_url": transcriptions_container_sas_url,
             "channel_id": channel_id,
-            "member_details": member_details
+            "member_details": member_details,
+            "channel_name": channel_name
         }
         # pm_assistant_form_blockにメンバーIDリストを渡す
         # trigger_idは一度だけ使用可能
@@ -322,19 +340,39 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
     
     # 各変数を定義
     view_state = view["state"]["values"]
-    # MTGアウトライン（テキスト）
-    agenda_text = view_state["agenda"][list(view_state["agenda"].keys())[0]]["value"]
-    # Boxファイルパス（テキスト）
-    box_file_path = view_state["box_url"][list(view_state["box_url"].keys())[0]]["value"]
-    # private_metadataのパース
-    
+
+    print(f"view_state: {view_state}")
+
+    # 音声ファイル（テキスト）
+    # agenda_text = view_state["agenda"][list(view_state["agenda"].keys())[0]]["value"]
+    # # Boxファイルパス（テキスト）
+    # box_file_path = view_state["box_url"][list(view_state["box_file_path"].keys())[0]]["value"]
+    # # ミーティングアウトラインファイルパス（テキスト）
+    # box_outline_file_path = view_state["box_outline_url"][list(view_state["box_outline_file_path"].keys())[0]]["value"]
+    # # ミーティングアウトラインNo（テキスト）
+    # box_outline_no = view_state["box_outline_no"][list(view_state["box_outline_no"].keys())[0]]["value"]
+
+        # Boxファイルパス（テキスト）
+    box_file_path = view_state["box_url"]["box_file_path"]["value"]
+
+    # ミーティングアウトラインファイルパス（テキスト）
+    outline_file_box_path = view_state["box_outline_url"]["box_outline_file_path"]["value"]
+
+    # ミーティングアウトラインNo（テキスト）
+    outline_number = view_state["box_outline_no"]["box_outline_no"]["value"]
 
 
+
+
+
+
+    # private_metadataのパース（slackのチャンネルID、メンバー情報、コンテナのSAS URL）
     private_metadata = json.loads(view.get("private_metadata", "{}"))
     audio_container_sas_url = private_metadata.get("audio_container_sas_url")
     transcriptions_container_sas_url = private_metadata.get("transcriptions_container_sas_url")
     channel_id_from_metadata = private_metadata.get("channel_id")
     member_details = private_metadata.get("member_details")
+    channel_name = private_metadata.get("channel_name")
 
     try:
         #1.処理開始
@@ -389,58 +427,95 @@ def handle_pm_assistant_form_post(ack, body, view: dict, client, logger: Logger)
         if "?" in box_file_path:
             box_file_path = box_file_path.split("?")[0]
         box_file_id = box_file_path.split('/')[-1]
-        logger.info(f"BOX ID取得完了: {box_file_id}")
+        logger.info(f"BOX 音声ファイルID取得完了: {box_file_id}")
+
+         # 入力データoutline_file_box_pathのバリデーション
+        box_outline_domain = "https://sisco001.ent.box.com/file"
+
+        # 任意なので空も許容する
+        if not outline_file_box_path:
+            outline_file_box_id = ""
+            logger.info("BOX ミーティングアウトラインID未指定")
+            pass
+        else:
+            # https://sisco001.ent.box.com/file以外ならエラー
+            if not outline_file_box_path.startswith(box_outline_domain):
+                raise ValueError("入力されたリンクが不正です。\n"
+                                f"※'{box_outline_domain}/XXXXX'の形式で入力してください。")
+            
+            # https://sisco001.ent.box.com/file/1931781410243 の file以降の数字を取得
+            outline_file_box_id = outline_file_box_path.split('/')[-1]
+
+            # "xxx.com/file/1934340618266?s=cxmxwccaqmbdzjpnhe80wtbtw25bwc59"のように、パラメータありの場合はパラメータを削除
+            # box_file_idもパラメータを除去した形で取得する
+            if "?" in outline_file_box_path:
+                outline_file_box_path = outline_file_box_path.split("?")[0]
+            outline_file_box_id = outline_file_box_path.split('/')[-1]
+            logger.info(f"BOX ミーティングアウトラインID取得完了: {outline_file_box_id}")
 
 
-        slack_channel_menbers = [member["display_name"] for member in member_details]
+        # 入力データoutline_numberのバリデーション
+        if not outline_number:
+            # 指定文言（未指定）をセット
+            outline_number = "未指定"
+        else:
+            # 入力がある場合は整数のみ許可、そうでなければエラー
+            if not outline_number.isdigit():
+                raise ValueError("ミーティングアウトライン番号は整数のみ入力してください。")
+
+            # 整数の時に範囲を判定
+            min_outline_no = 1
+            max_outline_no = 9999
+            if int(outline_number) < min_outline_no or int(outline_number) > max_outline_no:
+                raise ValueError("ミーティングアウトライン番号は1～9999の整数で入力してください。")
+        
+        # outline_file_box_idが存在する場合はoutline_numberが必要
+        if outline_file_box_id and (not outline_number or outline_number == "未指定"):
+            raise ValueError("URL（ミーティングアウトライン）が指定されている場合は、必ずミーティングアウトライン番号を入力してください。")
+
+        # チャンネルメンバーの表示名を取得
+        slack_channel_members = [member["display_name"] for member in member_details]
         if DEBUG_MODE:
             client.chat_postMessage(
                 channel=channel_id_from_metadata,
                 text=(
-                    "入力情報を取得しました。\n"
+                    "リクエストパラメータは以下の通り\n"
                     "----------------------------------------\n"
-                    f"box_file_id: {box_file_id}\n"
-                    f"execution_user: {slack_user["name"]}\n"
-                    f"channel_id: {channel_id_from_metadata}\n"
-                    f"slack_channel_menbers: {slack_channel_menbers}\n"
-                    f"agenda_text: {agenda_text}\n"
+                    f"executionUser: {slack_user['name']}\n"
+                    f"audioFileBoxId: {box_file_id}\n"
+                    f"outlineFileBoxId: {outline_file_box_id}\n"
+                    f"outlineNumber: {outline_number}\n"
+                    f"inputContainerSasUrl: {audio_container_sas_url}\n"
+                    f"outputContainerSasUrl: {transcriptions_container_sas_url}\n"
+                    f"slackChannelId: {channel_id_from_metadata}\n"
+                    f"slackChannelName: {channel_name}\n"
+                    f"slackChannelMembers: {slack_channel_members}\n"
                     "----------------------------------------\n"
                 )
             )
 
+
         #3.HULFT Squareのジョブを叩く
         #文字列に変換
-        slack_channel_members_str = ", ".join(slack_channel_menbers)
+        slack_channel_members_str = ", ".join(slack_channel_members)
         print(f"slack_channel_members_str: {slack_channel_members_str}")
 
         logger.info("HULFT Squareのジョブ実行開始")
 
         res = invoke_hsq_translation_api(
             access_token=new_access_token,
-            # new_access_token=refresh_token,
             audio_file_box_id=box_file_id,
+            outline_file_box_id=outline_file_box_id,
+            outline_number=outline_number,
             execution_user=slack_user["name"],
             input_container_sas_url=audio_container_sas_url,
             output_container_sas_url=transcriptions_container_sas_url,
             slack_channel_id=channel_id_from_metadata,
-            slack_channel_member=slack_channel_members_str,
-            option=agenda_text
+            slack_channel_members=slack_channel_members_str,
+            slack_channel_name=channel_name,
+            option=""
         )
         logger.info("HULFT Squareのジョブ実行完了")
-
-        if DEBUG_MODE:
-            client.chat_postMessage(
-                channel=channel_id_from_metadata,
-                text="リクエストパラメーターは以下の通りです。\n"
-                f"access_token: {new_access_token}\n"
-                f"audio_file_box_id: {box_file_id}\n"
-                f"execution_user: {slack_user["name"]}\n"
-                f"input_container_sas_url: {audio_container_sas_url}\n"
-                f"output_container_sas_url: {transcriptions_container_sas_url}\n"
-                f"slack_channel_id: {channel_id_from_metadata}\n"
-                f"slack_channel_member: {slack_channel_members_str}\n"
-                f"option: {agenda_text}\n"
-            )  
 
         # client.chat_postMessage(
         #     channel=channel_id_from_metadata,

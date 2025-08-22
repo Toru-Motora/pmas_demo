@@ -16,31 +16,10 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
         "type": "modal",
         "callback_id": "pm_assistant_form",
         "title": {"type": "plain_text", "text": "プロジェクトリスク評価"},
-        "submit": {"type": "plain_text", "text": "実行"},
+        "submit": {"type": "plain_text", "text": "分析"},
         "close": {"type": "plain_text", "text": "終了する"},
         "private_metadata": json.dumps(json_body),
         "blocks": [
-            # {
-            #     "block_id": "member_name",
-            #     "type": "input",
-            #     "element": {
-            #         "type": "multi_users_select",
-            #         "placeholder": {
-            #             "type": "plain_text", 
-            #             "text": " "
-            #             },
-            #         "initial_users": [member["id"] for member in member_details] if member_details and isinstance(member_details[0], dict) and "id" in member_details[0] else member_details,
-            #         #"max_selected_items": 10,
-            #     },
-            #     "label": {
-            #         "type": "plain_text", 
-            #         "text": ":white_check_mark: プロジェクトメンバー"
-            #     },
-            #     "hint": {
-            #         "type": "plain_text",
-            #         "text": "チャンネルに参加しているユーザーが表示されています。\n入力内容をご確認頂き、MTG参加者を設定して下さい。",
-            #     },
-            # },
             {
                 "block_id": "box_url",
                 "type": "input",
@@ -48,39 +27,101 @@ def pm_assistant_form_block(slack_user_id: str, member_details: list[str], json_
                     "type": "plain_text_input",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "https://sisco001.ent.box.com/file/xxxxxxxxxx",
+                        "text": "例）https://sisco001.ent.box.com/file/xxxxxxxxxx",
                     },
                     "action_id": "box_file_path",
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": "Boxリンク"
+                    "text": "Box URL（録音ファイル）"
                 },
                 "hint": {
                     "type": "plain_text",
-                    "text": "打ち合わせの録音ファイル（m4a形式）をBoxで表示し、ブラウザで表示されたURLを貼り付けてください。",
+                    "text": "会議の録音ファイル（m4a、mp4形式）のURLを貼り付けてください。",
                 },
             },
             {
-                "block_id": "agenda",
+                "block_id": "box_outline_url",
                 "type": "input",
                 "optional": True, # True = 任意
                 "element": {
                     "type": "plain_text_input",
-                    "multiline": True,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": "変更管理の追加費用について合意する\n6月中に検収する方針で合意する\nUIの仕様を確定する",
+                        "text": "例）https://sisco001.ent.box.com/file/xxxxxxxxxx",
                     },
+                    "action_id": "box_outline_file_path",
                 },
                 "label": {
                     "type": "plain_text", 
-                    "text": "個別評価項目"
-                    },
+                    "text": "Box URL（ミーティングアウトライン）"
+                },
                 "hint": {
                     "type": "plain_text",
-                    "text": "基本分析に加えて、ここに入力された項目をPMアシスタントが個別に評価します。確認したい観点を1行に1つずつ入力してください。",
+                    "text": "ミーティングアウトライン（xlsx形式）のURLを張り付けてください。",
                 },
             },
+            {
+                "block_id": "box_outline_no",
+                "type": "input",
+                "optional": True, # True = 任意
+                "element": {
+                    "type": "plain_text_input",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "例）1～9999の整数",
+                    },
+                    "action_id": "box_outline_no",
+                },
+                "label": {
+                    "type": "plain_text", 
+                    "text": "ミーティングアウトライン番号"
+                },
+                "hint": {
+                    "type": "plain_text",
+                    "text": "※ Box URL（ミーティングアウトライン）を利用する際は、ミーティングアウトライン番号を必ず入力してください。",
+                },
+            },
+            # {
+            #     "block_id": "outline_box_url",
+            #     "type": "input",
+            #     "element": {
+            #         "type": "plain_text_input",
+            #         "placeholder": {
+            #             "type": "plain_text",
+            #             "text": "例）https://sisco001.ent.box.com/file/xxxxxxxxxx",
+            #         },
+            #         "action_id": "outline_box_file_path",
+            #     },
+            #     "label": {
+            #         "type": "plain_text", 
+            #         "text": "ミーティングアウトラインのBoxURL"
+            #     },
+            #     "hint": {
+            #         "type": "plain_text",
+            #         "text": "ミーティングアウトラインファイル（xlsx形式）をBoxで表示し、ブラウザで表示されたURLを貼り付けてください。",
+            #     },
+            # },
+            # {
+            #     "block_id": "agenda",
+            #     "type": "input",
+            #     # "optional": True, # True = 任意
+            #     "element": {
+            #         "type": "plain_text_input",
+            #         "multiline": True,
+            #         "placeholder": {
+            #             "type": "plain_text",
+            #             "text": "例）\n・変更管理の追加費用について合意する（期限：8/1）\n・6月中に検収する方針で合意する（期限：8/1）\n・UIの仕様を確定する（期限：8/1）",
+            #         },
+            #     },
+            #     "label": {
+            #         "type": "plain_text", 
+            #         "text": "ミーティングアウトラインの項目"
+            #         },
+            #     "hint": {
+            #         "type": "plain_text",
+            #         "text": "入力されたミーティングアウトラインの項目をPMアシスタントが個別に評価します。確認観点を1行に1つずつ入力してください。",
+            #     },
+            # },
         ],
     }
