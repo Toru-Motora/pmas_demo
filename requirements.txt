@@ -1,0 +1,8 @@
+slack_bolt
+slack_sdk
+websocket-client
+azure-storage-blob
+flask
+flake8
+black
+isort

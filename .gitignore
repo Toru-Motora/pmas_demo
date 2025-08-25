@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv
+venv/
+env/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Azure
+.azure/
+local.settings.json
+
+# Logs
+*.log
+logs/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.zip
+*.mp3
+*.mp4
+*.wav
+*.txt
+!requirements.txt
+
+# Secrets and credentials
+credentials.json
+*_key.json
+*_secret.json 
+
+# slack
+./slack/_pycache_/
